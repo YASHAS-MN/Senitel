@@ -1,0 +1,58 @@
+{
+  "dataset": {
+    "genuine_total": 2824,
+    "genuine_train": 2260,
+    "genuine_test": 564,
+    "negative_total": 990
+  },
+  "calibration": {
+    "low_anchor": -0.03257411846379843,
+    "high_anchor": 0.0842804825668459
+  },
+  "roc_auc": 0.9455369295794828,
+  "operating_point": {
+    "trust_cut": 60,
+    "false_reject_rate": 0.23404255319148937,
+    "false_accept_rate": 0.0,
+    "confusion_matrix_labels": [
+      "genuine",
+      "negative"
+    ],
+    "confusion_matrix": [
+      [
+        432,
+        132
+      ],
+      [
+        0,
+        990
+      ]
+    ]
+  },
+  "trust_distribution": {
+    "genuine_test": {
+      "FULL": 373,
+      "STEPUP": 59,
+      "RESTRICT": 52,
+      "LOCK": 80
+    },
+    "negative": {
+      "FULL": 0,
+      "STEPUP": 0,
+      "RESTRICT": 0,
+      "LOCK": 990
+    }
+  },
+  "genuine_test_trust_summary": {
+    "mean": 77.92712149020315,
+    "median": 99.31888500544318,
+    "min": 0.0,
+    "max": 100.0
+  },
+  "negative_trust_summary": {
+    "mean": 4.63402994198076,
+    "median": 0.010019013998098665,
+    "min": 0.0,
+    "max": 25.97669138642371
+  }
+}

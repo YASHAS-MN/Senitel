@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Local/cache files
+.DS_Store
+Thumbs.db
+
+# Optional: raw data can be huge
+data/true_sessions/
+data/hardnegtive_sessions/
+
+# Keep generated model/processed data only if you want reproducible demo
+# model_out/
+# data/processed/
+# reports/figures/
