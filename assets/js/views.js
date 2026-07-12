@@ -340,6 +340,8 @@ Views.profile = {
         <div class="panel">
           <h3 class="section-title" style="margin-top:0">Login Credentials</h3>
           <div class="info-row"><span class="k">Current username</span><span class="v" id="credCurrentUser">${Credentials.getUsernameSync()}</span></div>
+          <div class="field" style="margin-top:14px"><label>Current password</label>
+            <input id="credCurrentPass" type="password" placeholder="Required to save changes"></div>
           <div class="field" style="margin-top:14px"><label>New username</label>
             <input id="credNewUser" placeholder="Leave blank to keep current"></div>
           <div class="field"><label>New password</label>
@@ -355,6 +357,8 @@ Views.profile = {
             Locked). Known only to you \u2014 never shared, never stored in
             plain text.
           </p>
+          <div class="field"><label>Current recovery key</label>
+            <input id="recoveryCurrentKey" type="password" placeholder="Required to save a new key"></div>
           <div class="field"><label>New recovery key</label>
             <input id="recoveryNewKey" type="password" placeholder="Enter a new recovery key"></div>
           <button id="recoverySetBtn" class="btn">Save recovery key</button>
@@ -367,9 +371,17 @@ Views.profile = {
   init(){
     const recBtn = $("recoverySetBtn");
     if(recBtn) recBtn.onclick = async ()=>{
+      const current = $("recoveryCurrentKey").value.trim();
       const v = $("recoveryNewKey").value.trim();
+      if(!current){ showToast("Enter your current recovery key first","warning"); return; }
       if(!v){ showToast("Enter a key first","warning"); return; }
-      await RecoveryKey.set(v);
+      try{
+        await RecoveryKey.set(v, current);
+      } catch(e){
+        showToast(e.message || "Failed to update recovery key","error");
+        return;
+      }
+      $("recoveryCurrentKey").value = "";
       $("recoveryNewKey").value = "";
       showToast("Recovery key updated","success");
       addAudit("Recovery key updated");
@@ -378,10 +390,12 @@ Views.profile = {
     const credBtn = $("credSaveBtn");
     if(credBtn) credBtn.onclick = async ()=>{
       const newUser = $("credNewUser").value.trim();
+      const currentPass = $("credCurrentPass").value.trim();
       const newPass = $("credNewPass").value.trim();
       const confirmPass = $("credConfirmPass").value.trim();
 
       if(!newUser && !newPass){ showToast("Enter a new username or password first","warning"); return; }
+      if(!currentPass){ showToast("Enter your current password first","warning"); return; }
       if(newPass && newPass !== confirmPass){ showToast("Passwords don't match","error"); return; }
       if(newPass && newPass.length < 8){ showToast("Password must be at least 8 characters","warning"); return; }
 
@@ -389,14 +403,14 @@ Views.profile = {
       // SQLite) -- must be awaited, or the UI could clear the form and show
       // a success toast before the server actually persisted the change.
       try{
-        if(newUser) await Credentials.setUsername(newUser);
-        if(newPass) await Credentials.set(newPass);
+        if(newUser) await Credentials.setUsername(newUser, currentPass);
+        if(newPass) await Credentials.set(newPass, currentPass);
       } catch(e){
         showToast(e.message || "Failed to update credentials","error");
         return;
       }
 
-      $("credNewUser").value = ""; $("credNewPass").value = ""; $("credConfirmPass").value = "";
+      $("credCurrentPass").value = ""; $("credNewUser").value = ""; $("credNewPass").value = ""; $("credConfirmPass").value = "";
       $("credCurrentUser").textContent = Credentials.getUsernameSync();
       showToast("Login credentials updated","success");
       addAudit("Login credentials changed");

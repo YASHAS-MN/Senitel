@@ -156,6 +156,9 @@ def predict():
 def save_recovery_key():
     body = request.get_json(silent=True) or {}
     key = body.get("key", "")
+    current_key = body.get("currentKey", "")
+    if has_recovery_key_set() and not verify_recovery_key(current_key):
+        return jsonify({"ok": False, "error": "Current recovery key is incorrect."}), 403
     try:
         set_recovery_key(key)
     except ValueError as e:
@@ -191,6 +194,9 @@ def save_credentials():
     body = request.get_json(silent=True) or {}
     username = body.get("username", "")
     password = body.get("password", "")
+    current_password = body.get("currentPassword", "")
+    if has_credentials_set() and not verify_credentials(get_username(), current_password):
+        return jsonify({"ok": False, "error": "Current password is incorrect."}), 403
     try:
         set_credentials(username, password)
     except ValueError as e:
@@ -204,6 +210,9 @@ def save_credentials():
 def rename_username():
     body = request.get_json(silent=True) or {}
     username = body.get("username", "")
+    current_password = body.get("currentPassword", "")
+    if has_credentials_set() and not verify_credentials(get_username(), current_password):
+        return jsonify({"ok": False, "error": "Current password is incorrect."}), 403
     try:
         set_username_only(username)
     except ValueError as e:

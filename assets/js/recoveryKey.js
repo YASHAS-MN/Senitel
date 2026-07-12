@@ -24,11 +24,11 @@ const RecoveryKey = {
     }
   },
 
-  async set(plain){
+  async set(plain, currentKey=""){
     const res = await fetch(`${this.API_BASE}/api/recovery-key`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: plain })
+      body: JSON.stringify({ key: plain, currentKey })
     });
     const data = await res.json().catch(() => ({}));
     if(!res.ok || !data.ok){

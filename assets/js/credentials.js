@@ -34,11 +34,11 @@ const Credentials = {
     return this._cachedUsername || CONFIG.DEFAULT_USERNAME;
   },
 
-  async setUsername(name){
+  async setUsername(name, currentPassword=""){
     const res = await fetch(`${this.API_BASE}/api/credentials/username`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: name })
+      body: JSON.stringify({ username: name, currentPassword })
     });
     const data = await res.json().catch(() => ({}));
     if(!res.ok || !data.ok){
@@ -60,12 +60,12 @@ const Credentials = {
     }
   },
 
-  async set(plain){
+  async set(plain, currentPassword=""){
     const username = this._cachedUsername || await this.getUsername();
     const res = await fetch(`${this.API_BASE}/api/credentials`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password: plain })
+      body: JSON.stringify({ username, password: plain, currentPassword })
     });
     const data = await res.json().catch(() => ({}));
     if(!res.ok || !data.ok){
