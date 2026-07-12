@@ -16,6 +16,11 @@ Endpoints:
     POST /predict   {"features": {...37 keys...}} -> the exact contract
                      mlAdapter.js already expects
     POST /reset      clears the smoothing state (call this on login)
+    POST /api/recovery-key           save/overwrite the owner recovery key
+                                      (Argon2id hash only, never plaintext)
+    POST /api/recovery-key/verify    verify an attempted recovery key,
+                                      used to clear a full lockout
+    GET  /api/recovery-key/status    whether a recovery key has been set yet
 
 Why smoothing: the held-out evaluation showed ~23% of genuine sessions can
 dip below the step-up threshold in a single snapshot (FRR). In CONTINUOUS
@@ -40,6 +45,15 @@ if str(ROOT_DIR) not in sys.path:
 
 from ml_pipeline.feature_extractor import FEATURE_KEYS
 from ml_pipeline.train_model import band_of, band_labels, trust_from_score
+
+# --- recovery key: Argon2id hashing + SQLite storage (see recovery_key_store.py) ---
+from server.recovery_key_store import set_recovery_key, verify_recovery_key, has_recovery_key_set
+
+# --- login credentials: Argon2id hashing + SQLite storage (see credentials_store.py) ---
+from server.credentials_store import (
+    set_credentials, verify_credentials, get_username,
+    has_credentials_set, set_username_only,
+)
 
 MODEL_DIR = Path(os.environ.get("MODEL_DIR", ROOT_DIR / "model_out"))
 ALPHA = float(os.environ.get("TRUST_SMOOTHING_ALPHA", "0.4"))
@@ -127,6 +141,90 @@ def predict():
         "risk": risk,
         "anomaly_score": round(raw_score, 4),
         "raw_trust": round(raw_trust, 1),   # debugging aid, not required by the frontend
+    })
+
+
+# --------------------------------------------------------------------------
+# Recovery key endpoints (Objective 4: tamper-resistant, fail-closed recovery)
+#
+# The plaintext key is only ever present in this request's body, in memory,
+# for the duration of hashing/verification -- it is never logged, never
+# written to disk, and never sent back in any response.
+# --------------------------------------------------------------------------
+
+@app.route("/api/recovery-key", methods=["POST"])
+def save_recovery_key():
+    body = request.get_json(silent=True) or {}
+    key = body.get("key", "")
+    try:
+        set_recovery_key(key)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"failed to save recovery key: {e}"}), 500
+    return jsonify({"ok": True})
+
+
+@app.route("/api/recovery-key/verify", methods=["POST"])
+def check_recovery_key():
+    body = request.get_json(silent=True) or {}
+    key = body.get("key", "")
+    ok = verify_recovery_key(key)
+    return jsonify({"ok": ok})
+
+
+@app.route("/api/recovery-key/status", methods=["GET"])
+def recovery_key_status():
+    return jsonify({"isSet": has_recovery_key_set()})
+
+
+# --------------------------------------------------------------------------
+# Login credential endpoints (username + Argon2id-hashed password, SQLite)
+#
+# The plaintext password is only ever present in this request's body, in
+# memory, for the duration of hashing/verification -- never logged, never
+# written to disk, never sent back in any response.
+# --------------------------------------------------------------------------
+
+@app.route("/api/credentials", methods=["POST"])
+def save_credentials():
+    body = request.get_json(silent=True) or {}
+    username = body.get("username", "")
+    password = body.get("password", "")
+    try:
+        set_credentials(username, password)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"failed to save credentials: {e}"}), 500
+    return jsonify({"ok": True})
+
+
+@app.route("/api/credentials/username", methods=["POST"])
+def rename_username():
+    body = request.get_json(silent=True) or {}
+    username = body.get("username", "")
+    try:
+        set_username_only(username)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True})
+
+
+@app.route("/api/credentials/verify", methods=["POST"])
+def check_credentials():
+    body = request.get_json(silent=True) or {}
+    username = body.get("username", "")
+    password = body.get("password", "")
+    ok = verify_credentials(username, password)
+    return jsonify({"ok": ok})
+
+
+@app.route("/api/credentials/status", methods=["GET"])
+def credentials_status():
+    return jsonify({
+        "isSet": has_credentials_set(),
+        "username": get_username(),  # not secret, safe to expose
     })
 
 

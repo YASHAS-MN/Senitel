@@ -1,30 +1,103 @@
 /* ============================================================
    credentials.js — real login credentials for this prototype.
-   Username is stored plainly (it's not a secret); the password is
-   hashed with SHA-256 (see core.js:sha256), never stored in plain
-   text. Changeable from Profile & Security.
+   Username and password are both stored server-side (see
+   server/credentials_store.py): the password as an Argon2id hash
+   in SQLite, never in plaintext and never in the browser.
+   Changeable from Profile & Security.
    ============================================================ */
 
 const Credentials = {
-  USER_KEY: "bg_username",
-  HASH_KEY: "bg_password_hash",
+  API_BASE: (typeof CONFIG !== "undefined" && CONFIG.API_URL) || "http://127.0.0.1:5000",
 
-  getUsername(){ return localStorage.getItem(this.USER_KEY) || CONFIG.DEFAULT_USERNAME; },
+  // Cached locally only for synchronous display purposes (e.g. showing the
+  // username in the header without an await on every render). This is NOT
+  // a source of truth -- always re-synced from the server via status().
+  _cachedUsername: null,
 
-  setUsername(name){ localStorage.setItem(this.USER_KEY, name); },
-
-  isSet(){ return !!localStorage.getItem(this.HASH_KEY); },
-
-  async set(plain){
-    localStorage.setItem(this.HASH_KEY, await sha256(plain));
+  async getUsername(){
+    if(this._cachedUsername) return this._cachedUsername;
+    try{
+      const res = await fetch(`${this.API_BASE}/api/credentials/status`, { method: "GET" });
+      const data = await res.json();
+      this._cachedUsername = data.username || CONFIG.DEFAULT_USERNAME;
+    } catch(e){
+      console.error("Credentials.getUsername: request failed", e);
+      this._cachedUsername = CONFIG.DEFAULT_USERNAME;
+    }
+    return this._cachedUsername;
   },
 
-  async verify(plain){
-    return (await sha256(plain)) === localStorage.getItem(this.HASH_KEY);
+  // Synchronous read of the warmed cache, for use inside render() functions
+  // that can't await. Falls back to the config default if nothing has been
+  // fetched yet (app.js's seedDefaultIfMissing() warms this on startup).
+  getUsernameSync(){
+    return this._cachedUsername || CONFIG.DEFAULT_USERNAME;
+  },
+
+  async setUsername(name){
+    const res = await fetch(`${this.API_BASE}/api/credentials/username`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: name })
+    });
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok || !data.ok){
+      throw new Error(data.error || "Failed to update username.");
+    }
+    this._cachedUsername = name;
+    return true;
+  },
+
+  async isSet(){
+    try{
+      const res = await fetch(`${this.API_BASE}/api/credentials/status`, { method: "GET" });
+      if(!res.ok) return false;
+      const data = await res.json();
+      return !!data.isSet;
+    } catch(e){
+      console.error("Credentials.isSet: request failed", e);
+      return false;
+    }
+  },
+
+  async set(plain){
+    const username = this._cachedUsername || await this.getUsername();
+    const res = await fetch(`${this.API_BASE}/api/credentials`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password: plain })
+    });
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok || !data.ok){
+      throw new Error(data.error || "Failed to save password.");
+    }
+    return true;
+  },
+
+  async verify(plain, usernameAttempt){
+    try{
+      const username = usernameAttempt !== undefined ? usernameAttempt : (this._cachedUsername || await this.getUsername());
+      const res = await fetch(`${this.API_BASE}/api/credentials/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password: plain })
+      });
+      if(!res.ok) return false;
+      const data = await res.json();
+      return !!data.ok;
+    } catch(e){
+      console.error("Credentials.verify: request failed", e);
+      return false; // fail closed -- network/server trouble must never log someone in
+    }
   },
 
   async seedDefaultIfMissing(){
-    if(!localStorage.getItem(this.USER_KEY)) this.setUsername(CONFIG.DEFAULT_USERNAME);
-    if(!this.isSet()) await this.set(CONFIG.DEFAULT_PASSWORD);
+    if(!(await this.isSet())){
+      this._cachedUsername = CONFIG.DEFAULT_USERNAME;
+      await this.set(CONFIG.DEFAULT_PASSWORD);
+    } else {
+      // warm the cache so later getUsername() calls are synchronous-feeling
+      await this.getUsername();
+    }
   }
 };

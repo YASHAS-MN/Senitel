@@ -23,8 +23,11 @@ const CONFIG = {
   DEFAULT_RECOVERY_KEY: "owner-secret-2026",
 
   // Login credentials (Objective 1) \u2014 demo defaults, change in Profile & Security
+  // NOTE: password must be >= 8 chars -- server/credentials_store.py enforces
+  // this minimum (Argon2id-hashed, stored server-side), and seeding will
+  // fail with a shorter default.
   DEFAULT_USERNAME: "yashas",
-  DEFAULT_PASSWORD: "demo",
+  DEFAULT_PASSWORD: "demopass123",
 
   // Post-recovery grace (bug fix): after a successful recovery-key unlock,
   // trust can't be pushed back into RESTRICT/LOCK for this long, even if a

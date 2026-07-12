@@ -42,9 +42,13 @@ Views.login = {
       const p = $("password").value.trim();
       if(!u || !p){ showToast("Enter username and password","warning"); return; }
 
-      const okUser = u.toLowerCase() === Credentials.getUsername().toLowerCase();
-      const okPass = await Credentials.verify(p);
-      if(!okUser || !okPass){
+      // Credentials.verify() now checks the TYPED username together with the
+      // password against the server (Argon2id + SQLite), in one call -- it
+      // no longer trusts a locally-cached username, which previously would
+      // have let a mismatched username slip through as long as the password
+      // matched the cached account.
+      const ok = await Credentials.verify(p, u);
+      if(!ok){
         showToast("Incorrect username or password","error");
         addSecurityEvent("Failed login attempt","warning");
         return;
@@ -335,7 +339,7 @@ Views.profile = {
           <div class="info-row"><span class="k">Policy</span><span class="v" id="policyStatus">${PolicyEngine.current().label}</span></div></div>
         <div class="panel">
           <h3 class="section-title" style="margin-top:0">Login Credentials</h3>
-          <div class="info-row"><span class="k">Current username</span><span class="v" id="credCurrentUser">${Credentials.getUsername()}</span></div>
+          <div class="info-row"><span class="k">Current username</span><span class="v" id="credCurrentUser">${Credentials.getUsernameSync()}</span></div>
           <div class="field" style="margin-top:14px"><label>New username</label>
             <input id="credNewUser" placeholder="Leave blank to keep current"></div>
           <div class="field"><label>New password</label>
@@ -379,13 +383,21 @@ Views.profile = {
 
       if(!newUser && !newPass){ showToast("Enter a new username or password first","warning"); return; }
       if(newPass && newPass !== confirmPass){ showToast("Passwords don't match","error"); return; }
-      if(newPass && newPass.length < 4){ showToast("Password must be at least 4 characters","warning"); return; }
+      if(newPass && newPass.length < 8){ showToast("Password must be at least 8 characters","warning"); return; }
 
-      if(newUser) Credentials.setUsername(newUser);
-      if(newPass) await Credentials.set(newPass);
+      // Both calls are now network requests to the Flask API (Argon2id +
+      // SQLite) -- must be awaited, or the UI could clear the form and show
+      // a success toast before the server actually persisted the change.
+      try{
+        if(newUser) await Credentials.setUsername(newUser);
+        if(newPass) await Credentials.set(newPass);
+      } catch(e){
+        showToast(e.message || "Failed to update credentials","error");
+        return;
+      }
 
       $("credNewUser").value = ""; $("credNewPass").value = ""; $("credConfirmPass").value = "";
-      $("credCurrentUser").textContent = Credentials.getUsername();
+      $("credCurrentUser").textContent = Credentials.getUsernameSync();
       showToast("Login credentials updated","success");
       addAudit("Login credentials changed");
       addSecurityEvent("Login credentials changed","warning");

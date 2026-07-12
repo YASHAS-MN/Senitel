@@ -45,13 +45,12 @@ function showToast(message, type="info"){
 // tiny DOM helper
 const $ = (id) => document.getElementById(id);
 
-// Shared hashing helper -- used by recoveryKey.js and credentials.js so the
-// two security-secret modules never drift apart on how they hash.
-async function sha256(text){
-  const enc = new TextEncoder().encode(text);
-  const buf = await crypto.subtle.digest("SHA-256", enc);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-}
+// NOTE: the recovery key and login password are no longer hashed here.
+// Both secrets are now hashed server-side with Argon2id and stored in
+// SQLite (see server/recovery_key_store.py and server/credentials_store.py).
+// recoveryKey.js and credentials.js only ever send the plaintext secret to
+// the Flask API over the request body -- they do no hashing or storage of
+// their own, so there is no client-side hashing helper needed here anymore.
 
 // The Living Signature -- a flowing ink-line waveform representing trust.
 // Markup is static; CSS drives the flowing animation. JS only ever toggles

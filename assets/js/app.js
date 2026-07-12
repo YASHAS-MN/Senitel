@@ -29,7 +29,7 @@ function buildSidebar(){
     `<a data-view="${v}"><span>${ic}</span><span>${label}</span></a>`).join("");
 }
 
-document.addEventListener("DOMContentLoaded", ()=>{
+document.addEventListener("DOMContentLoaded", async ()=>{
   // Build the shell
   document.querySelector(".nav").innerHTML = buildSidebar();
   document.querySelectorAll(".nav a").forEach(a=>{
@@ -56,8 +56,20 @@ document.addEventListener("DOMContentLoaded", ()=>{
   });
 
   // Demo convenience: seed known defaults if the owner hasn't set their own.
-  Credentials.seedDefaultIfMissing();
-  RecoveryKey.seedDefaultIfMissing();
+  // RecoveryKey.seedDefaultIfMissing() now calls the Flask API (Argon2id +
+  // SQLite), so it must be awaited -- otherwise the app can finish loading
+  // before the seed request resolves. Wrapped so a not-yet-running backend
+  // fails loud (console) instead of silently.
+  try{
+    await Credentials.seedDefaultIfMissing();
+  } catch(e){
+    console.error("Credentials.seedDefaultIfMissing failed:", e);
+  }
+  try{
+    await RecoveryKey.seedDefaultIfMissing();
+  } catch(e){
+    console.error("RecoveryKey.seedDefaultIfMissing failed (is the Flask server running?):", e);
+  }
 
   // One trust subscription -> current view + a band-transition watch that
   // triggers the total-lockout recovery modal (Objective 4).
