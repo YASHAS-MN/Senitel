@@ -2,7 +2,7 @@
 <div align="center">
   <img src="assets/banner.jpg" alt="BankGuard Banner" width="900" style="border-radius: 12px; margin-bottom: 20px;">
   
-  # 🛡️ BankGuard
+  # 🛡️ Senitel
 
   ### **Continuous Behavioral-Authentication Banking Prototype**
   
